@@ -88,14 +88,12 @@ class MaxUnpoolingOp : public Operator {
         << "currently, only zero padding is allowed.";
     CHECK_EQ(param_.pad[1], 0) 
         << "currently, only zero padding is allowed.";
-    mshadow::Shape<2> data_shape = Shape2(data.shape_[2], data.shape_[3]);
     
     Assign(out,
            req[max_unpool_enum::kOut],
            max_unpool_forward(
                          mask,
                          data,
-                         data_shape,
                          out_shape,
                          param_.kernel[0],
                          param_.kernel[1],
@@ -120,14 +118,12 @@ class MaxUnpoolingOp : public Operator {
     Tensor<xpu, 4> input_grad = in_grad[max_unpool_enum::kData].get<xpu, 4, real_t>(s);
     Tensor<xpu, 4> mask_grad = in_grad[max_unpool_enum::kPoolMask].get<xpu, 4, real_t>(s);
     mshadow::Shape<2> mask_shape = Shape2(mask.shape_[2], mask.shape_[3]);
-    mshadow::Shape<2> grad_shape = Shape2(grad.shape_[2], grad.shape_[3]);
 
     Assign(input_grad, req[max_unpool_enum::kData],
               max_unpool_backward(
                               mask,
                               grad,
                               mask_shape,
-                              grad_shape,
                               param_.kernel[0],
                               param_.kernel[1],
                               param_.stride[0]));
@@ -181,7 +177,6 @@ class MaxUnpoolingProp : public OperatorProperty {
              << "Uncompatible Shapes on dimension : "<<j<<" data:"<< dshape[j] << ", mask:" <<  tmp[j];
         }
     }
-    // TODO: feel like this doesn't make sense
     if(unpool_size_[0] <= 0 || unpool_size_[1] <= 0){
         oshape[2] = std::max((dshape[2] - 1) * param_.stride[0] + param_.kernel[0] - 2 * param_.pad[0],
                                 dshape[2] * param_.stride[0] - param_.pad[0] + 1);
