@@ -174,14 +174,12 @@ class MaxUnpoolingProp : public OperatorProperty {
         if (tmp.ndim() == 0) return false;
         for (index_t j = 0; j < dshape.ndim(); ++j) {
             CHECK_EQ(dshape[j], tmp[j])
-             << "Uncompatible Shapes on dimension : "<<j<<" data:"<< dshape[j] << ", mask:" <<  tmp[j];
+             << "Uncompatible Shapes on dimension : "<< j << " data:"<< dshape[j] << ", mask:" <<  tmp[j];
         }
     }
     if(unpool_size_[0] <= 0 || unpool_size_[1] <= 0){
-        oshape[2] = std::max((dshape[2] - 1) * param_.stride[0] + param_.kernel[0] - 2 * param_.pad[0],
-                                dshape[2] * param_.stride[0] - param_.pad[0] + 1);
-        oshape[3] = std::max((dshape[3] - 1) * param_.stride[1] + param_.kernel[1] - 2 * param_.pad[1],
-                            dshape[3] * param_.stride[1] - param_.pad[1] + 1);
+        oshape[2] = (dshape[2] - 1) * param_.stride[0] + param_.kernel[0] - 2 * param_.pad[0];
+        oshape[3] = (dshape[3] - 1) * param_.stride[1] + param_.kernel[1] - 2 * param_.pad[1];
     }
     else {
         oshape[2] = unpool_size_[0];
