@@ -13,7 +13,8 @@ namespace op {
 template<>
 Operator *CreateOp<gpu>(BatchNormParam param) {
 #if MXNET_USE_CUDNN == 1 && CUDNN_MAJOR >= 5
-  return new CuDNNBatchNormOp(param);
+  return new BatchNormOp<gpu>(param);
+  //return new CuDNNBatchNormOp(param);
 #else
   return new BatchNormOp<gpu>(param);
 #endif
