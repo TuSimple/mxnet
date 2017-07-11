@@ -124,6 +124,7 @@ struct ProposalParam : public dmlc::Parameter<ProposalParam> {
   int rpn_post_nms_top_n;
   float threshold;
   int rpn_min_size;
+  int batch_images;
   NumericalParam<float> scales;
   NumericalParam<float> ratios;
   int feature_stride;
@@ -140,6 +141,8 @@ struct ProposalParam : public dmlc::Parameter<ProposalParam> {
     .describe("NMS value, below which to suppress.");
     DMLC_DECLARE_FIELD(rpn_min_size).set_default(16)
     .describe("Minimum height or width in proposal");
+    DMLC_DECLARE_FIELD(batch_images).set_default(1)
+    .describe("Size of images for each device");
     tmp[0] = 4.0f; tmp[1] = 8.0f; tmp[2] = 16.0f; tmp[3] = 32.0f;
     DMLC_DECLARE_FIELD(scales).set_default(NumericalParam<float>(tmp, tmp + 4))
     .describe("Used to generate anchor windows by enumerating scales");
@@ -186,9 +189,9 @@ class ProposalProp : public OperatorProperty {
     SHAPE_ASSIGN_CHECK(*in_shape, proposal::kImInfo, im_info_shape);
     out_shape->clear();
     // output
-    out_shape->push_back(Shape3(dshape[0], param_.rpn_post_nms_top_n, 5));
+    out_shape->push_back(Shape3(param_.batch_images, param_.rpn_post_nms_top_n, 5));
     // score
-    out_shape->push_back(Shape3(dshape[0], param_.rpn_post_nms_top_n, 1));
+    out_shape->push_back(Shape3(param_.batch_images, param_.rpn_post_nms_top_n, 1));
     return true;
   }
 
