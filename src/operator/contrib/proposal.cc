@@ -345,7 +345,7 @@ class ProposalOp : public Operator{
             workspace_proposals[n][index][1] = workspace_proposals[n][i][1] + j * param_.feature_stride;
             workspace_proposals[n][index][2] = workspace_proposals[n][i][2] + k * param_.feature_stride;
             workspace_proposals[n][index][3] = workspace_proposals[n][i][3] + j * param_.feature_stride;
-            workspace_proposals[n][index][4] = scores[n][i + width * height * num_anchors][j][k];
+            workspace_proposals[n][index][4] = scores[n][i][j][k];
           }
         }
       }
