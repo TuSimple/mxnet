@@ -152,5 +152,61 @@ class PolyScheduler(LRScheduler):
         # NOTE: use while rather than if  (for continuing training via load_epoch)
         return self.base_lr * math.pow(1 - float(num_update) / self.total_update, self.power)
 
+class WarmUpScheduler(LRScheduler):
+    """Gradually ramps up the learning rate from a small to a large value
 
+    Learning rate will increase from *begin_lr* to *end_lr* during *begin_iter* ~ *end_iter*
 
+    Assume there exists *k* such that::
+       step[k] <= num_update and num_update < step[k+1]
+
+    Then calculate the new learning rate by::
+       cur_lr * pow(factor, k+1)
+
+    Parameters
+    ----------
+    begin_lr, end_lr : float
+        The beginning and ending learning rate
+    begin_iter, end_iter : int
+        WarmUp iterations
+    step: list of int
+        The list of steps to schedule a change
+    factor: float
+        The factor to change the learning rate
+    """
+    def __init__(self, begin_lr, end_lr, begin_iter, end_iter, step, factor=1):
+        super(WarmUpScheduler, self).__init__()
+        assert isinstance(step, list) and len(step) >= 1
+        for i, _step in enumerate(step):
+            if i != 0 and step[i] <= step[i-1]:
+                raise ValueError("Schedule step must be an increasing integer list")
+            if _step < 1:
+                raise ValueError("Schedule step must be greater or equal than 1 round")
+        if factor > 1.0:
+            raise ValueError("Factor must be no more than 1 to make lr reduce")
+        self.step = step
+        self.cur_step_ind = 0
+        self.lr_diff = (end_lr - begin_lr) / (end_iter - begin_iter)
+        self.cur_lr = begin_lr
+        self.end_lr = end_lr
+        self.begin_iter = begin_iter
+        self.end_iter = end_iter
+        self.factor = factor
+        self.count = 0
+
+    def __call__(self, num_update):
+        # NOTE: use while rather than if  (for continuing training via load_epoch)
+        if self.begin_iter <= num_update and num_update < self.end_iter:
+            self.cur_lr += self.lr_diff
+        elif num_update == self.end_iter:
+            self.cur_lr = self.end_lr
+        while self.cur_step_ind <= len(self.step)-1:
+            if num_update > self.step[self.cur_step_ind]:
+                self.count = self.step[self.cur_step_ind]
+                self.cur_step_ind += 1
+                self.cur_lr *= self.factor
+                logging.info("Update[%d]: Change learning rate to %0.5e",
+                             num_update, self.cur_lr)
+            else:
+                return self.cur_lr
+        return self.cur_lr
