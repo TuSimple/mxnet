@@ -89,10 +89,10 @@ __global__ void ROIPoolForwardKernel(const int count, const Dtype* bottom_data,
 }
 
 template<typename Dtype>
-inline void ROIPoolForward(const Tensor<gpu, 5, Dtype> &out,
+inline void ROIPoolForward(const Tensor<gpu, 4, Dtype> &out,
                            const Tensor<gpu, 4, Dtype> &data,
-                           const Tensor<gpu, 3, Dtype> &bbox,
-                           const Tensor<gpu, 5, Dtype> &max_idx,
+                           const Tensor<gpu, 2, Dtype> &bbox,
+                           const Tensor<gpu, 4, Dtype> &max_idx,
                            const float spatial_scale,
                            const float pad_ratio) {
   const Dtype *bottom_data = data.dptr_;
@@ -103,8 +103,8 @@ inline void ROIPoolForward(const Tensor<gpu, 5, Dtype> &out,
   const int channels = data.size(1);
   const int height = data.size(2);
   const int width = data.size(3);
-  const int pooled_height = out.size(3);
-  const int pooled_width = out.size(4);
+  const int pooled_height = out.size(2);
+  const int pooled_width = out.size(3);
   const int gridSize = (count + kMaxThreadsPerBlock - 1) / kMaxThreadsPerBlock;
   dim3 dimGrid(kMaxGridDim, (gridSize + kMaxGridDim - 1) / kMaxGridDim);
   dim3 dimBlock(kMaxThreadsPerBlock);
@@ -195,9 +195,9 @@ __global__ void ROIPoolBackwardAccKernel(const int count, const Dtype* top_diff,
 
 template<typename Dtype>
 inline void ROIPoolBackwardAcc(const Tensor<gpu, 4, Dtype> &in_grad,
-                               const Tensor<gpu, 5, Dtype> &out_grad,
-                               const Tensor<gpu, 3, Dtype> &bbox,
-                               const Tensor<gpu, 5, Dtype> &max_idx,
+                               const Tensor<gpu, 4, Dtype> &out_grad,
+                               const Tensor<gpu, 2, Dtype> &bbox,
+                               const Tensor<gpu, 4, Dtype> &max_idx,
                                const float spatial_scale,
                                const float pad_ratio) {
   const Dtype *top_diff = out_grad.dptr_;
@@ -205,12 +205,12 @@ inline void ROIPoolBackwardAcc(const Tensor<gpu, 4, Dtype> &in_grad,
   Dtype *bottom_diff = in_grad.dptr_;
   Dtype *argmax_data = max_idx.dptr_;
   const int count = in_grad.shape_.Size();
-  const int num_rois = bbox.size(1);
+  const int num_rois = bbox.size(0);
   const int channels = in_grad.size(1);
   const int height = in_grad.size(2);
   const int width = in_grad.size(3);
-  const int pooled_height = out_grad.size(3);
-  const int pooled_width = out_grad.size(4);
+  const int pooled_height = out_grad.size(2);
+  const int pooled_width = out_grad.size(3);
   const int gridSize = (count + kMaxThreadsPerBlock - 1) / kMaxThreadsPerBlock;
   dim3 dimGrid(kMaxGridDim, (gridSize + kMaxGridDim - 1) / kMaxGridDim);
   dim3 dimBlock(kMaxThreadsPerBlock);
@@ -224,10 +224,10 @@ inline void ROIPoolBackwardAcc(const Tensor<gpu, 4, Dtype> &in_grad,
 }  // namespace cuda
 
 template<typename Dtype>
-inline void ROIPoolForward(const Tensor<gpu, 5, Dtype> &out,
+inline void ROIPoolForward(const Tensor<gpu, 4, Dtype> &out,
                            const Tensor<gpu, 4, Dtype> &data,
-                           const Tensor<gpu, 3, Dtype> &bbox,
-                           const Tensor<gpu, 5, Dtype> &max_idx,
+                           const Tensor<gpu, 2, Dtype> &bbox,
+                           const Tensor<gpu, 4, Dtype> &max_idx,
                            const float spatial_scale,
                            const float pad_ratio) {
   cuda::ROIPoolForward(out, data, bbox, max_idx, spatial_scale, pad_ratio);
@@ -235,9 +235,9 @@ inline void ROIPoolForward(const Tensor<gpu, 5, Dtype> &out,
 
 template<typename Dtype>
 inline void ROIPoolBackwardAcc(const Tensor<gpu, 4, Dtype> &in_grad,
-                               const Tensor<gpu, 5, Dtype> &out_grad,
-                               const Tensor<gpu, 3, Dtype> &bbox,
-                               const Tensor<gpu, 5, Dtype> &max_idx,
+                               const Tensor<gpu, 4, Dtype> &out_grad,
+                               const Tensor<gpu, 2, Dtype> &bbox,
+                               const Tensor<gpu, 4, Dtype> &max_idx,
                                const float spatial_scale,
                                const float pad_ratio) {
   cuda::ROIPoolBackwardAcc(in_grad, out_grad, bbox, max_idx, spatial_scale, pad_ratio);
