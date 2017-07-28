@@ -31,7 +31,6 @@ enum ROIPoolingOpOutputs {kOut, kMaxIdx};
 struct ROIPoolingParam : public dmlc::Parameter<ROIPoolingParam> {
   TShape pooled_size;
   float spatial_scale;
-  int batch_images;
   float pad_ratio;
   DMLC_DECLARE_PARAMETER(ROIPoolingParam) {
     DMLC_DECLARE_FIELD(pooled_size)
@@ -40,8 +39,6 @@ struct ROIPoolingParam : public dmlc::Parameter<ROIPoolingParam> {
     DMLC_DECLARE_FIELD(spatial_scale).set_range(0.0, 1.0)
     .describe("Ratio of input feature map height (or w) to raw image height (or w). "
     "Equals the reciprocal of total stride in convolutional layers");
-    DMLC_DECLARE_FIELD(batch_images).set_default(1)
-    .describe("Size of images for each device");
     DMLC_DECLARE_FIELD(pad_ratio).set_range(0.0, 1.0).set_default(0.0)
     .describe("pad ratio of rois, one-sided");
   }
@@ -164,13 +161,13 @@ class ROIPoolingProp : public OperatorProperty {
     TShape dshape = in_shape->at(roipool::kData);
     CHECK_EQ(dshape.ndim(), 4U) << "data should be a 4D tensor";
 
-    // bbox: [batch_rois, 5]
+    // bbox: [num_rois, 5]
     TShape bshape = in_shape->at(roipool::kBox);
-    CHECK_EQ(bshape.ndim(), 2U) << "bbox should be a 2D tensor of shape [batch_rois, 5]";
-    CHECK_EQ(bshape[1], 5U) << "bbox should be a 2D tensor of shape [batch_rois, 5]";
+    CHECK_EQ(bshape.ndim(), 2U) << "bbox should be a 2D tensor of shape [batch, 5]";
+    CHECK_EQ(bshape[1], 5U) << "bbox should be a 2D tensor of shape [batch, 5]";
 
-    // out: [batch_rois, c, pooled_h, pooled_w]
-    // max_idx: [batch_rois, c, pooled_h, pooled_w]
+    // out: [num_rois, c, pooled_h, pooled_w]
+    // max_idx: [num_rois, c, pooled_h, pooled_w]
     out_shape->clear();
     out_shape->push_back(
          Shape4(bshape[0], dshape[1], param_.pooled_size[0], param_.pooled_size[1]));
