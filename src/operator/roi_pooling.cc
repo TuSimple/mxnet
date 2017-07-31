@@ -18,10 +18,10 @@ using std::ceil;
 
 namespace mshadow {
 template<typename Dtype>
-inline void ROIPoolForward(const Tensor<cpu, 5, Dtype> &out,
+inline void ROIPoolForward(const Tensor<cpu, 4, Dtype> &out,
                            const Tensor<cpu, 4, Dtype> &data,
-                           const Tensor<cpu, 3, Dtype> &bbox,
-                           const Tensor<cpu, 5, Dtype> &max_idx,
+                           const Tensor<cpu, 2, Dtype> &bbox,
+                           const Tensor<cpu, 4, Dtype> &max_idx,
                            const float spatial_scale_,
                            const float pad_ratio_) {
   const Dtype *bottom_data = data.dptr_;
@@ -31,10 +31,10 @@ inline void ROIPoolForward(const Tensor<cpu, 5, Dtype> &out,
   const int channels_ = data.size(1);
   const int height_ = data.size(2);
   const int width_ = data.size(3);
-  const int pooled_height_ = out.size(3);
-  const int pooled_width_ = out.size(4);
+  const int pooled_height_ = out.size(2);
+  const int pooled_width_ = out.size(3);
 
-  const int num_rois = bbox.size(1);
+  const int num_rois = bbox.size(0);
   const int batch_size = data.size(0);
   const int data_size = data.size(1) * data.size(2) * data.size(3);
   // For each ROI R = [batch_index x1 y1 x2 y2]: max pool over R
@@ -101,11 +101,11 @@ inline void ROIPoolForward(const Tensor<cpu, 5, Dtype> &out,
       }
       // Increment all data pointers by one channel
       batch_data += data.size(2) * data.size(3);
-      top_data += out.size(3) * out.size(4);
-      argmax_data += max_idx.size(3) * max_idx.size(4);
+      top_data += out.size(2) * out.size(3);
+      argmax_data += max_idx.size(2) * max_idx.size(3);
     }
     // Increment ROI data pointer
-    bottom_rois += bbox.size(2);
+    bottom_rois += bbox.size(1);
   }
 
   return;
@@ -113,9 +113,9 @@ inline void ROIPoolForward(const Tensor<cpu, 5, Dtype> &out,
 
 template<typename Dtype>
 inline void ROIPoolBackwardAcc(const Tensor<cpu, 4, Dtype> &in_grad,
-                               const Tensor<cpu, 5, Dtype> &out_grad,
-                               const Tensor<cpu, 3, Dtype> &bbox,
-                               const Tensor<cpu, 5, Dtype> &max_idx,
+                               const Tensor<cpu, 4, Dtype> &out_grad,
+                               const Tensor<cpu, 2, Dtype> &bbox,
+                               const Tensor<cpu, 4, Dtype> &max_idx,
                                const float spatial_scale_,
                                const float pad_ratio_) {
   const Dtype *top_diff = out_grad.dptr_;
@@ -127,10 +127,10 @@ inline void ROIPoolBackwardAcc(const Tensor<cpu, 4, Dtype> &in_grad,
   const int channels_ = in_grad.size(1);
   const int height_ = in_grad.size(2);
   const int width_ = in_grad.size(3);
-  const int pooled_height_ = out_grad.size(4);
-  const int pooled_width_ = out_grad.size(5);
+  const int pooled_height_ = out_grad.size(2);
+  const int pooled_width_ = out_grad.size(3);
 
-  const int num_rois = bbox.size(1);
+  const int num_rois = bbox.size(0);
 
   for (int b = 0; b < batch_size_; ++b) {
     for (int c = 0; c < channels_; ++c) {
