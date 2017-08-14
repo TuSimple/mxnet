@@ -1,13 +1,34 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 """Tools for testing."""
 # pylint: disable=too-many-lines
 from __future__ import absolute_import, print_function, division
 import time
+import gzip
+import struct
 import traceback
 import numbers
 import subprocess
+import sys
 import os
 import errno
 import logging
+from contextlib import contextmanager
 import numpy as np
 import numpy.testing as npt
 import mxnet as mx
@@ -943,9 +964,6 @@ def download(url, fname=None, dirname=None, overwrite=False):
     """
     if fname is None:
         fname = url.split('/')[-1]
-    if not overwrite and os.path.exists(fname):
-        logging.info("%s exists, skip to downloada", fname)
-        return fname
 
     if dirname is None:
         dirname = os.path.dirname(fname)
@@ -959,6 +977,10 @@ def download(url, fname=None, dirname=None, overwrite=False):
             except OSError as exc:
                 if exc.errno != errno.EEXIST:
                     raise OSError('failed to create ' + dirname)
+
+    if not overwrite and os.path.exists(fname):
+        logging.info("%s exists, skipping download", fname)
+        return fname
 
     r = requests.get(url, stream=True)
     assert r.status_code == 200, "failed to open %s" % url
@@ -1018,3 +1040,45 @@ def set_env_var(key, val, default_val=""):
     prev_val = os.environ.get(key, default_val)
     os.environ[key] = val
     return prev_val
+
+def same_array(array1, array2):
+    """Check whether two NDArrays sharing the same memory block
+
+    Parameters
+    ----------
+
+    array1 : NDArray
+        First NDArray to be checked
+    array2 : NDArray
+        Second NDArray to be checked
+
+    Returns
+    -------
+    bool
+        Whether two NDArrays share the same memory
+    """
+    array1[:] += 1
+    if not same(array1.asnumpy(), array2.asnumpy()):
+        array1[:] -= 1
+        return False
+    array1[:] -= 1
+    return same(array1.asnumpy(), array2.asnumpy())
+
+@contextmanager
+def discard_stderr():
+    """
+    Discards error output of a routine if invoked as:
+
+    with discard_stderr():
+        ...
+    """
+
+    try:
+        stderr_fileno = sys.stderr.fileno()
+        old_stderr = os.dup(stderr_fileno)
+        bit_bucket = open(os.devnull, 'w')
+        os.dup2(bit_bucket.fileno(), stderr_fileno)
+        yield
+    finally:
+        os.dup2(old_stderr, stderr_fileno)
+        bit_bucket.close()
