@@ -157,7 +157,7 @@ nnvm::NodeEntry AggregateGradient(std::vector<nnvm::NodeEntry>&& v) {
   static const Op* zeros_op = Op::Get("_zeros");
   static const Op* zeros_like_op = Op::Get("zeros_like");
 
-  if (v.size() == 0) {
+  if (v.empty()) {
     nnvm::NodePtr ng = nnvm::Node::Create();
     ng->attrs.op = zeros_op;
     ng->attrs.name = "zeros";
@@ -166,17 +166,12 @@ nnvm::NodeEntry AggregateGradient(std::vector<nnvm::NodeEntry>&& v) {
   }
 
   // remove zero in the sum. at least keep 1.
-  size_t begin = 0;
-  for (size_t i = 0; i < v.size(); ++i) {
-    if (v[i].node->op() != zeros_op && v[i].node->op() != zeros_like_op) {
-      if (begin != i) {
-        v[begin] = std::move(v[i]);
-      }
-      ++begin;
-    }
-  }
-  if (begin == 0) begin = 1;
-  v.resize(begin);
+  auto begin = std::remove_if(v.begin(), v.end(), [](const nnvm::NodeEntry& nodeEntry) {
+     return nodeEntry.node->op() == zeros_op || nodeEntry.node->op() == zeros_like_op;
+  });
+  if (begin == v.begin()) ++begin;
+  v.erase(begin, v.end());
+  CHECK(!v.empty());
 
   if (v.size() == 1) {
     return std::move(v[0]);
@@ -601,7 +596,7 @@ void GraphExecutor::Init(nnvm::Symbol symbol,
   }
 
   g.attrs["storage_type"] = std::make_shared<dmlc::any>(std::move(arg_stypes));
-  g = InferStorageType(std::move(g), std::move(StorageTypeVector()), "");
+  g = InferStorageType(std::move(g), StorageTypeVector(), "");
   if (g.GetAttr<size_t>("storage_type_num_unknown_nodes") != 0U) {
     HandleInferStorageTypeError(num_forward_inputs_, g.indexed_graph(),
                                 g.GetAttr<StorageTypeVector>("storage_type"));
@@ -1478,9 +1473,6 @@ void GraphExecutor::RunOps(bool is_train, size_t topo_start, size_t topo_end) {
       CHECK_EQ(opnode.exec->in_array.size(), 1U);
       CHECK_EQ(opnode.exec->out_array.size(), 1U);
       CopyFromTo(opnode.exec->in_array[0], &(opnode.exec->out_array[0]));
-    } else if (opnode.exec->exec_type() == ExecType::kLocal) {
-      bool is_gpu = opnode.ctx.dev_mask() == gpu::kDevMask;
-      opnode.exec->Run(RunContext{opnode.ctx, nullptr}, is_gpu);
     } else if (opnode.cached_opr != nullptr) {
 #if MXNET_USE_PROFILER
       bool profiling = engine::Profiler::Get()->GetState() == engine::Profiler::kRunning;

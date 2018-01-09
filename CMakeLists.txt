@@ -38,7 +38,7 @@ mxnet_option(USE_MKL_EXPERIMENTAL "Use experimental MKL (if MKL enabled and foun
 mxnet_option(USE_OPERATOR_TUNING  "Enable auto-tuning of operators" ON AND NOT MSVC)
 mxnet_option(USE_GPERFTOOLS       "Build with GPerfTools support (if found)" ON)
 mxnet_option(USE_JEMALLOC         "Build with Jemalloc support"   ON)
-mxnet_option(USE_PROFILER         "Build with Profiler support"   OFF)
+mxnet_option(USE_PROFILER         "Build with Profiler support"   ON)
 mxnet_option(USE_DIST_KVSTORE     "Build with DIST_KVSTORE support" OFF)
 mxnet_option(USE_PLUGINS_WARPCTC  "Use WARPCTC Plugins" OFF)
 mxnet_option(USE_PLUGIN_CAFFE     "Use Caffe Plugin" OFF)
@@ -47,6 +47,7 @@ mxnet_option(USE_MXNET_LIB_NAMING "Use MXNet library naming conventions." ON)
 mxnet_option(USE_GPROF            "Compile with gprof (profiling) flag" OFF)
 mxnet_option(USE_VTUNE            "Enable use of Intel Amplifier XE (VTune)" OFF) # one could set VTUNE_ROOT for search path
 mxnet_option(INSTALL_EXAMPLES     "Install the example source files." OFF)
+mxnet_option(USE_SIGNAL_HANDLER   "Print stack traces on segfaults." OFF)
 
 
 
@@ -54,10 +55,13 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/build/private/local_config.cmake)
   include(${CMAKE_CURRENT_SOURCE_DIR}/build/private/local_config.cmake)
 endif()
 
+if(MSVC)
+  set(SYSTEM_ARCHITECTURE x86_64)
+else()
+  EXECUTE_PROCESS( COMMAND uname -m COMMAND tr -d '\n' OUTPUT_VARIABLE SYSTEM_ARCHITECTURE)
+endif()
+
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/Modules;${CMAKE_MODULE_PATH}")
-
-
-
 
 SET(EXTRA_OPERATORS "" CACHE PATH "EXTRA OPERATORS PATH")
 
@@ -84,6 +88,9 @@ else(MSVC)
   check_cxx_compiler_flag("-std=c++0x"   SUPPORT_CXX0X)
   check_cxx_compiler_flag("-msse2"       SUPPORT_MSSE2)
   set(CMAKE_C_FLAGS "-Wall -Wno-unknown-pragmas -fPIC -Wno-sign-compare")
+  if ("${CMAKE_CXX_COMPILER_ID}" MATCHES ".*Clang$")
+    set(CMAKE_C_FLAGS "-Wno-braced-scalar-init")
+  endif()
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g")
   elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
@@ -184,7 +191,7 @@ endforeach()
 
 include_directories("include")
 include_directories("mshadow")
-include_directories("cub")
+include_directories("3rdparty/cub")
 include_directories("nnvm/include")
 include_directories("dmlc-core/include")
 include_directories("dlpack/include")
@@ -263,11 +270,13 @@ endif()
 # ---[ OpenMP
 if(USE_OPENMP)
   find_package(OpenMP REQUIRED)
-  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/openmp/CMakeLists.txt)
+  # This should build on Windows, but there's some problem and I don't have a Windows box, so
+  # could a Windows user please fix?
+  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/openmp/CMakeLists.txt AND SYSTEM_ARCHITECTURE STREQUAL "x86_64" AND NOT MSVC)
     # Intel/llvm OpenMP: https://github.com/llvm-mirror/openmp
     set(OPENMP_STANDALONE_BUILD TRUE)
-    set(LIBOMP_ENABLE_SHARED FALSE)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/openmp)
+    set(LIBOMP_ENABLE_SHARED TRUE)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/openmp)
     list(REMOVE_ITEM mxnet_LINKER_LIBS iomp5)
     list(APPEND mxnet_LINKER_LIBS omp)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
@@ -306,6 +315,15 @@ if(USE_JEMALLOC)
 endif()
 
 include(CTest)
+set(GTEST_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/googletest/googletest")
+set(GTEST_INCLUDE_DIR ${GTEST_ROOT}/include)
+#set(GTEST_BOTH_LIBRARIES gtest gtest_main)
+set(GTEST_LIBRARIES gtest gtest_main)
+set(GTEST_MAIN_LIBRARY gtest_main)
+set(GTEST_LIBRARY gtest)
+
+add_subdirectory(${GTEST_ROOT})
+find_package(GTest REQUIRED)
 
 # cudnn detection
 if(USE_CUDNN AND USE_CUDA)
@@ -564,6 +582,10 @@ install(TARGETS ${MXNET_INSTALL_TARGETS}
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 if (INSTALL_EXAMPLES)
   install(DIRECTORY example  DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME})
+endif()
+
+if (USE_SIGNAL_HANDLER)
+	add_definitions(-DMXNET_USE_SIGNAL_HANDLER=1)
 endif()
 
 # AUTO_INSTALL_DIR -> Optional: specify post-build install direcory
