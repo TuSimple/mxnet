@@ -59,7 +59,7 @@ inline void ROIPoolForward(const Tensor<cpu, 4, Dtype> &out,
   for (int n = 0; n < num_rois; ++n) {
     int roi_batch_ind = bottom_rois[0];
     assert(roi_batch_ind >= 0);
-    assert(roi_batch_ind < data.size(0) /* batch size */);
+    assert(static_cast<index_t>(roi_batch_ind) < data.size(0) /* batch size */);
 
     Dtype pad_w = (bottom_rois[3] - bottom_rois[1] + 1) * pad_ratio_;
     Dtype pad_h = (bottom_rois[4] - bottom_rois[2] + 1) * pad_ratio_;

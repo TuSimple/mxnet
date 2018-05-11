@@ -274,7 +274,7 @@ class Block(object):
         """
         self.collect_params().initialize(init, ctx, verbose)
 
-    def hybridize(self, active=True):
+    def hybridize(self, active=True, **kwargs):
         """Activates or deactivates :py:class:`HybridBlock` s recursively. Has no effect on
         non-hybrid children.
 
@@ -282,9 +282,11 @@ class Block(object):
         ----------
         active : bool, default True
             Whether to turn hybrid on or off.
+        **kwargs : string
+            Additional flags for hybridized operator.
         """
         for cld in self._children:
-            cld.hybridize(active)
+            cld.hybridize(active, **kwargs)
 
     def cast(self, dtype):
         """Cast this Block to use another data type.
@@ -343,6 +345,7 @@ class HybridBlock(Block):
         self._out_format = None
         self._in_format = None
         self._active = False
+        self._flags = {}
 
     def __setattr__(self, name, value):
         """Registers parameters."""
@@ -378,7 +381,7 @@ class HybridBlock(Block):
     def _build_cache(self, *args):
         inputs, out = self._get_graph(*args)
         input_idx = {var.name: i for i, var in enumerate(inputs)}
-        self._cached_op = ndarray.CachedOp(out)
+        self._cached_op = ndarray.CachedOp(out, self._flags)
         params = dict(self.collect_params().items())
 
         # verify graph inputs
@@ -437,9 +440,11 @@ class HybridBlock(Block):
         super(HybridBlock, self).register_child(block)
         self._clear_cached_op()
 
-    def hybridize(self, active=True):
+    def hybridize(self, active=True, **kwargs):
         self._active = active
-        super(HybridBlock, self).hybridize(active)
+        self._flags = kwargs.items()
+        self._clear_cached_op()
+        super(HybridBlock, self).hybridize(active, **kwargs)
 
     def cast(self, dtype):
         self._clear_cached_op()
@@ -465,7 +470,7 @@ class HybridBlock(Block):
         """Infers data type of Parameters from inputs."""
         self._infer_attrs('infer_type', 'dtype', *args)
 
-    def export(self, path):
+    def export(self, path, epoch=0):
         """Export HybridBlock to json format that can be loaded by `mxnet.mod.Module`
         or the C++ interface.
 
@@ -475,8 +480,10 @@ class HybridBlock(Block):
         Parameters
         ----------
         path : str
-            Path to save model. Two files `path-symbol.json` and `path-0000.params`
-            will be created.
+            Path to save model. Two files `path-symbol.json` and `path-xxxx.params`
+            will be created, where xxxx is the 4 digits epoch number.
+        epoch : int
+            Epoch number of saved model.
         """
         if not self._cached_graph:
             raise RuntimeError(
@@ -494,7 +501,7 @@ class HybridBlock(Block):
             else:
                 assert name in aux_names
                 arg_dict['aux:%s'%name] = param._reduce()
-        ndarray.save('%s-0000.params'%path, arg_dict)
+        ndarray.save('%s-%04d.params'%(path, epoch), arg_dict)
 
     def forward(self, x, *args):
         """Defines the forward computation. Arguments can be either
@@ -614,6 +621,11 @@ class SymbolBlock(HybridBlock):
         ret = copy.copy(self._cached_graph[1])
         ret._compose(**{k.name: v for k, v in zip(self._cached_graph[0], args)})
         return _regroup(list(ret), self._out_format)[0]
+
+    def _clear_cached_op(self):
+        tmp = self._cached_graph
+        super(SymbolBlock, self)._clear_cached_op()
+        self._cached_graph = tmp
 
     def hybrid_forward(self, F, x, *args, **kwargs):
         raise NotImplementedError
