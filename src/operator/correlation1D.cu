@@ -290,7 +290,7 @@ void Forward_gpu(
      
     int x_shift = - neighborhood_grid_radius_;
     if(single_side == -1) { // to the left
-      x_shift = -neighborhood_grid_width_;
+      x_shift = -neighborhood_grid_radius_;
     } else if(single_side == 1) { // to the right
       x_shift = 0;
     }
@@ -338,7 +338,7 @@ void Backward_gpu(
     
     int x_shift = - neighborhood_grid_radius_;
     if (single_side == -1) { // to the left
-      x_shift = -neighborhood_grid_width_;
+      x_shift = -neighborhood_grid_radius_;
     } else if(single_side == 1) { // to the right
       x_shift = 0;
     }
